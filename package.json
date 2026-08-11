@@ -1,40 +1,89 @@
 {
-  "name": "react-native-android-in-app-update",
-  "title": "React Native Android In App Update",
-  "version": "1.0.0",
-  "description": "Inapp update for react native android",
-  "main": "index.js",
+  "name": "react-native-inapp-update",
+  "title": "React Native In-App Update",
+  "version": "2.0.0",
+  "description": "In-app updates for React Native: Play Store update flows on Android and App Store version checks on iOS",
+  "source": "./src/index.ts",
+  "main": "./lib/commonjs/index.js",
+  "module": "./lib/module/index.js",
+  "types": "./lib/typescript/commonjs/src/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./lib/typescript/module/src/index.d.ts",
+        "default": "./lib/module/index.js"
+      },
+      "require": {
+        "types": "./lib/typescript/commonjs/src/index.d.ts",
+        "default": "./lib/commonjs/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
-    "README.md",
+    "src",
+    "lib",
     "android",
-    "index.js",
     "ios",
-    "react-native-android-in-app-update.podspec"
+    "react-native-inapp-update.podspec",
+    "README.md",
+    "!android/build",
+    "!ios/build",
+    "!**/__tests__",
+    "!**/.*"
   ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "typecheck": "tsc --noEmit",
+    "prepare": "bob build"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aditya-tripathy/react-native-android-in-app-update.git",
-    "baseUrl": "https://github.com/aditya-tripathy/react-native-android-in-app-update.git"
+    "url": "git+https://github.com/aditya-tripathy/react-native-inapp-update.git",
+    "baseUrl": "https://github.com/aditya-tripathy/react-native-inapp-update"
   },
   "keywords": [
-    "react-native"
+    "react-native",
+    "in-app-update",
+    "inapp-update",
+    "app-update",
+    "play-store",
+    "app-store",
+    "android",
+    "ios"
   ],
-  "author": "Aditya Kumar Tripathy <aditya.tripathy93@gmail.com>",
+  "author": "Aditya Tripathy",
   "license": "MIT",
   "licenseFilename": "LICENSE",
+  "bugs": {
+    "url": "https://github.com/aditya-tripathy/react-native-inapp-update/issues"
+  },
+  "homepage": "https://github.com/aditya-tripathy/react-native-inapp-update#readme",
   "peerDependencies": {
-    "react": "^16.8.1",
-    "react-native": ">=0.60.0-rc.0 <1.0.x"
+    "react": "*",
+    "react-native": "*"
   },
   "devDependencies": {
-    "react": "^16.9.0",
-    "react-native": "^0.61.5"
+    "@types/react": "^19.1.1",
+    "react": "19.2.8",
+    "react-native": "0.86.2",
+    "react-native-builder-bob": "^0.43.0",
+    "typescript": "^5.9.3"
   },
-  "bugs": {
-    "url": "https://github.com/aditya-tripathy/react-native-android-in-app-update/issues"
+  "codegenConfig": {
+    "name": "InAppUpdateSpec",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "com.thronie.inappupdate"
+    }
   },
-  "homepage": "https://github.com/aditya-tripathy/react-native-android-in-app-update#readme"
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      ["commonjs", { "esm": true }],
+      ["module", { "esm": true }],
+      "typescript"
+    ]
+  }
 }
