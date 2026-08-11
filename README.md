@@ -1,9 +1,9 @@
-# react-native-inapp-update
+# react-native-store-update
 
-[![npm version](https://img.shields.io/npm/v/react-native-inapp-update.svg)](https://www.npmjs.com/package/react-native-inapp-update)
-[![license](https://img.shields.io/npm/l/react-native-inapp-update.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/react-native-store-update.svg)](https://www.npmjs.com/package/react-native-store-update)
+[![license](https://img.shields.io/npm/l/react-native-store-update.svg)](LICENSE)
 
-📦 **npm**: [react-native-inapp-update](https://www.npmjs.com/package/react-native-inapp-update)
+📦 **npm**: [react-native-store-update](https://www.npmjs.com/package/react-native-store-update)
 
 Prompt users to update your React Native app:
 
@@ -24,9 +24,9 @@ Written as a TurboModule with a backward-compatible spec, so it works on both th
 ## Installation
 
 ```sh
-npm install react-native-inapp-update
+npm install react-native-store-update
 # or
-yarn add react-native-inapp-update
+yarn add react-native-store-update
 ```
 
 Then install pods:
@@ -45,7 +45,7 @@ import {
   startUpdate,
   completeUpdate,
   addInstallStatusListener,
-} from 'react-native-inapp-update';
+} from 'react-native-store-update';
 
 const info = await checkForUpdate();
 

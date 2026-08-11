@@ -1,6 +1,6 @@
 {
-  "name": "react-native-inapp-update",
-  "title": "React Native In-App Update",
+  "name": "react-native-store-update",
+  "title": "React Native Store Update",
   "version": "2.0.0",
   "description": "In-app updates for React Native: Play Store update flows on Android and App Store version checks on iOS",
   "source": "./src/index.ts",
@@ -25,7 +25,7 @@
     "lib",
     "android",
     "ios",
-    "react-native-inapp-update.podspec",
+    "react-native-store-update.podspec",
     "README.md",
     "!android/build",
     "!ios/build",
@@ -38,8 +38,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aditya-tripathy/react-native-inapp-update.git",
-    "baseUrl": "https://github.com/aditya-tripathy/react-native-inapp-update"
+    "url": "git+https://github.com/aditya-tripathy/react-native-store-update.git",
+    "baseUrl": "https://github.com/aditya-tripathy/react-native-store-update"
   },
   "keywords": [
     "react-native",
@@ -55,9 +55,9 @@
   "license": "MIT",
   "licenseFilename": "LICENSE",
   "bugs": {
-    "url": "https://github.com/aditya-tripathy/react-native-inapp-update/issues"
+    "url": "https://github.com/aditya-tripathy/react-native-store-update/issues"
   },
-  "homepage": "https://github.com/aditya-tripathy/react-native-inapp-update#readme",
+  "homepage": "https://github.com/aditya-tripathy/react-native-store-update#readme",
   "peerDependencies": {
     "react": "*",
     "react-native": "*"

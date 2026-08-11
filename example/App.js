@@ -5,7 +5,7 @@ import {
   checkForUpdate,
   completeUpdate,
   startUpdate,
-} from 'react-native-inapp-update';
+} from 'react-native-store-update';
 
 export default function App() {
   const [info, setInfo] = useState(null);
