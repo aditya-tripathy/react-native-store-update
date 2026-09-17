@@ -1,7 +1,7 @@
 {
   "name": "react-native-store-update",
   "title": "React Native Store Update",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "In-app updates for React Native: Play Store update flows on Android and App Store version checks on iOS",
   "source": "./src/index.ts",
   "main": "./lib/commonjs/index.js",
@@ -65,7 +65,7 @@
   "devDependencies": {
     "@types/react": "^19.1.1",
     "react": "19.2.8",
-    "react-native": "0.86.2",
+    "react-native": "0.87.0",
     "react-native-builder-bob": "^0.43.0",
     "typescript": "^5.9.3"
   },

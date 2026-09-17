@@ -9,6 +9,7 @@ buildscript {
   }
 
   dependencies {
+    // Only used when the library is built on its own; a consuming app's plugin versions win.
     classpath "com.android.tools.build:gradle:8.7.2"
     // noinspection DifferentKotlinGradleVersion
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${getExtOrDefault('kotlinVersion')}"
@@ -19,8 +20,23 @@ def isNewArchitectureEnabled() {
   return rootProject.hasProperty("newArchEnabled") && rootProject.getProperty("newArchEnabled") == "true"
 }
 
+// AGP 9 compiles Kotlin itself and fails the build if the Kotlin Android plugin is applied
+// on top. Apps can opt out with `android.builtInKotlin=false`, and AGP 8 has no built-in
+// Kotlin, so the plugin is applied only in those cases.
+def shouldApplyKotlinPlugin() {
+  def agpMajorVersion = com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')[0].toInteger()
+  if (agpMajorVersion <= 8) {
+    return true
+  }
+  def builtInKotlin = providers.gradleProperty("android.builtInKotlin").orNull
+  return builtInKotlin != null && !builtInKotlin.toBoolean()
+}
+
 apply plugin: "com.android.library"
-apply plugin: "kotlin-android"
+
+if (shouldApplyKotlinPlugin()) {
+  apply plugin: "kotlin-android"
+}
 
 if (isNewArchitectureEnabled()) {
   apply plugin: "com.facebook.react"
@@ -33,11 +49,11 @@ def getExtOrIntegerDefault(name) {
 android {
   namespace "com.thronie.inappupdate"
 
-  compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
+  compileSdk getExtOrIntegerDefault("compileSdkVersion")
 
   defaultConfig {
-    minSdkVersion getExtOrIntegerDefault("minSdkVersion")
-    targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
+    minSdk getExtOrIntegerDefault("minSdkVersion")
+    targetSdk getExtOrIntegerDefault("targetSdkVersion")
     buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
   }
 
@@ -51,26 +67,22 @@ android {
     }
   }
 
-  lintOptions {
+  lint {
     disable "GradleCompatible"
   }
 
+  // The React Native Gradle plugin aligns the Kotlin JVM target with these in consuming apps.
   compileOptions {
     sourceCompatibility JavaVersion.VERSION_17
     targetCompatibility JavaVersion.VERSION_17
   }
 
-  kotlinOptions {
-    jvmTarget = "17"
-  }
-
   sourceSets {
     main {
-      if (isNewArchitectureEnabled()) {
-        java.srcDirs += ["src/newarch"]
-      } else {
-        java.srcDirs += ["src/oldarch"]
-      }
+      // AGP 9 built-in Kotlin only compiles Kotlin from `kotlin` source directories.
+      def archSrcDir = isNewArchitectureEnabled() ? "src/newarch" : "src/oldarch"
+      java.srcDirs += [archSrcDir]
+      kotlin.srcDirs += [archSrcDir]
     }
   }
 }
@@ -83,6 +95,5 @@ repositories {
 dependencies {
   // Version is resolved by the React Native Gradle plugin in the consuming app
   implementation "com.facebook.react:react-android"
-  implementation "org.jetbrains.kotlin:kotlin-stdlib:${getExtOrDefault('kotlinVersion')}"
   implementation "com.google.android.play:app-update:2.1.0"
 }

@@ -8,9 +8,11 @@ import android.content.pm.PackageManager
 import android.os.Build
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.BaseActivityEventListener
+import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.bridge.WritableMap
 import com.google.android.play.core.appupdate.AppUpdateInfo
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
@@ -26,7 +28,12 @@ class InAppUpdateModule(reactContext: ReactApplicationContext) :
   InAppUpdateSpec(reactContext), InstallStateUpdatedListener {
 
   private val updateManager by lazy { AppUpdateManagerFactory.create(reactApplicationContext) }
+
+  // Update-flow state is confined to the UI thread: Play task callbacks, activity
+  // results and host lifecycle events are all delivered there.
   private var updatePromise: Promise? = null
+  private var isUpdateFlowLaunched = false
+  private var isHostPausedSinceLaunch = false
   private var isInstallListenerRegistered = false
 
   private val activityEventListener = object : BaseActivityEventListener() {
@@ -37,8 +44,7 @@ class InAppUpdateModule(reactContext: ReactApplicationContext) :
       data: Intent?
     ) {
       if (requestCode != UPDATE_REQUEST_CODE) return
-      val promise = updatePromise ?: return
-      updatePromise = null
+      val promise = takeUpdatePromise() ?: return
       when (resultCode) {
         Activity.RESULT_OK -> promise.resolve("accepted")
         Activity.RESULT_CANCELED -> promise.resolve("canceled")
@@ -48,8 +54,32 @@ class InAppUpdateModule(reactContext: ReactApplicationContext) :
     }
   }
 
+  private val lifecycleEventListener = object : LifecycleEventListener {
+    override fun onHostResume() {
+      // Android delivers activity results before the host resumes. If the update flow
+      // sent the host to the background and it is back without a result (for example the
+      // React context was not ready to receive it), that result is lost: settle the promise
+      // so later startUpdate() calls are not blocked forever.
+      if (isUpdateFlowLaunched && isHostPausedSinceLaunch) {
+        takeUpdatePromise()?.reject(
+          E_UPDATE_RESULT_LOST,
+          "The update flow finished without reporting a result."
+        )
+      }
+    }
+
+    override fun onHostPause() {
+      if (isUpdateFlowLaunched) {
+        isHostPausedSinceLaunch = true
+      }
+    }
+
+    override fun onHostDestroy() = Unit
+  }
+
   init {
     reactContext.addActivityEventListener(activityEventListener)
+    reactContext.addLifecycleEventListener(lifecycleEventListener)
   }
 
   override fun getName() = NAME
@@ -77,24 +107,34 @@ class InAppUpdateModule(reactContext: ReactApplicationContext) :
         return
       }
     }
+    UiThreadUtil.runOnUiThread { startUpdateOnUiThread(type, updateType, promise) }
+  }
 
+  private fun startUpdateOnUiThread(type: Int, updateType: String, promise: Promise) {
+    // Claim the flow before the asynchronous lookup so concurrent calls cannot both start one.
     if (updatePromise != null) {
       promise.reject(E_UPDATE_IN_PROGRESS, "An update flow is already in progress.")
       return
     }
+    updatePromise = promise
+    isUpdateFlowLaunched = false
+    isHostPausedSinceLaunch = false
 
     // The update info carries a single-use PendingIntent, so it has to be fresh.
     updateManager.appUpdateInfo
       .addOnSuccessListener { info ->
+        if (updatePromise !== promise) return@addOnSuccessListener
+
         val availability = info.updateAvailability()
         if (availability != UpdateAvailability.UPDATE_AVAILABLE &&
           availability != UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS
         ) {
-          promise.reject(E_NO_UPDATE_AVAILABLE, "No update is available for this app.")
+          failUpdate(promise, E_NO_UPDATE_AVAILABLE, "No update is available for this app.")
           return@addOnSuccessListener
         }
         if (!info.isUpdateTypeAllowed(type)) {
-          promise.reject(
+          failUpdate(
+            promise,
             E_UPDATE_TYPE_NOT_ALLOWED,
             "Play does not allow a '$updateType' update for this app right now."
           )
@@ -102,26 +142,29 @@ class InAppUpdateModule(reactContext: ReactApplicationContext) :
         }
         val activity = reactApplicationContext.currentActivity
         if (activity == null) {
-          promise.reject(E_NO_ACTIVITY, "The update flow needs a foreground activity.")
+          failUpdate(promise, E_NO_ACTIVITY, "The update flow needs a foreground activity.")
           return@addOnSuccessListener
         }
 
         registerInstallListener()
-        updatePromise = promise
         try {
-          updateManager.startUpdateFlowForResult(
+          val isStarted = updateManager.startUpdateFlowForResult(
             info,
             activity,
             AppUpdateOptions.defaultOptions(type),
             UPDATE_REQUEST_CODE
           )
+          if (isStarted) {
+            isUpdateFlowLaunched = true
+          } else {
+            failUpdate(promise, E_UPDATE_FAILED, "Play could not start the update flow.")
+          }
         } catch (error: IntentSender.SendIntentException) {
-          updatePromise = null
-          promise.reject(E_UPDATE_FAILED, "Failed to start the update flow: ${error.message}", error)
+          failUpdate(promise, E_UPDATE_FAILED, "Failed to start the update flow: ${error.message}", error)
         }
       }
       .addOnFailureListener { error ->
-        promise.reject(E_UPDATE_CHECK_FAILED, "Failed to check for updates: ${error.message}", error)
+        failUpdate(promise, E_UPDATE_CHECK_FAILED, "Failed to check for updates: ${error.message}", error)
       }
   }
 
@@ -162,8 +205,24 @@ class InAppUpdateModule(reactContext: ReactApplicationContext) :
       isInstallListenerRegistered = false
     }
     reactApplicationContext.removeActivityEventListener(activityEventListener)
-    updatePromise = null
+    reactApplicationContext.removeLifecycleEventListener(lifecycleEventListener)
+    UiThreadUtil.runOnUiThread { takeUpdatePromise() }
     super.invalidate()
+  }
+
+  private fun takeUpdatePromise(): Promise? {
+    val promise = updatePromise
+    updatePromise = null
+    isUpdateFlowLaunched = false
+    isHostPausedSinceLaunch = false
+    return promise
+  }
+
+  // Rejects only while `promise` still owns the flow, so a stale callback cannot settle a newer one.
+  private fun failUpdate(promise: Promise, code: String, message: String, error: Throwable? = null) {
+    if (updatePromise !== promise) return
+    takeUpdatePromise()
+    promise.reject(code, message, error)
   }
 
   private fun registerInstallListener() {
@@ -213,6 +272,8 @@ class InAppUpdateModule(reactContext: ReactApplicationContext) :
       packageInfo.versionCode.toLong()
     }
 
+  // REQUIRES_UI_INTENT is deprecated in Play Core but still reported by older Play Store versions.
+  @Suppress("DEPRECATION")
   private fun installStatusToString(status: Int) = when (status) {
     InstallStatus.PENDING -> "pending"
     InstallStatus.DOWNLOADING -> "downloading"
@@ -236,6 +297,7 @@ class InAppUpdateModule(reactContext: ReactApplicationContext) :
     private const val E_UPDATE_TYPE_NOT_ALLOWED = "E_UPDATE_TYPE_NOT_ALLOWED"
     private const val E_NO_ACTIVITY = "E_NO_ACTIVITY"
     private const val E_UPDATE_FAILED = "E_UPDATE_FAILED"
+    private const val E_UPDATE_RESULT_LOST = "E_UPDATE_RESULT_LOST"
     private const val E_COMPLETE_UPDATE_FAILED = "E_COMPLETE_UPDATE_FAILED"
   }
 }

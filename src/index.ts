@@ -15,7 +15,9 @@ export type InstallStatus =
   | 'installing'
   | 'installed'
   | 'failed'
-  | 'canceled';
+  | 'canceled'
+  /** Android: Play needs the user to confirm the update in its UI before it can continue. */
+  | 'requiresUiIntent';
 
 export type StartUpdateResult =
   /** Android: the user accepted the update. Immediate updates restart the app from here. */
@@ -49,7 +51,11 @@ export interface InstallStatusEvent {
 
 const INSTALL_STATUS_EVENT = 'InAppUpdate:installStatusChanged';
 
-const emitter = new NativeEventEmitter(
+type InstallStatusEvents = {
+  [INSTALL_STATUS_EVENT]: [InstallStatusEvent];
+};
+
+const emitter = new NativeEventEmitter<InstallStatusEvents>(
   // The event emitter is Android-only; on iOS this module never emits.
   NativeInAppUpdate as unknown as ConstructorParameters<
     typeof NativeEventEmitter
